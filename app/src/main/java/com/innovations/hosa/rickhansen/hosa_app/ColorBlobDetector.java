@@ -1,3 +1,4 @@
+/*
 package com.innovations.hosa.rickhansen.hosa_app;
 
 
@@ -106,4 +107,4 @@ public class ColorBlobDetector {
     public List<MatOfPoint> getContours() {
         return mContours;
     }
-}
+}*/

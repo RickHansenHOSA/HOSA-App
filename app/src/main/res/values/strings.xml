@@ -1,4 +1,10 @@
 <resources>
-    <string name="app_name">HOSA-OpenCVTest</string>
+    <string name="app_name">HOSA-App</string>
     <string name="action_settings">Settings</string>
+
+    <string name="drawer_app_name">KELP: Health</string>
+    <string name="drawer_team_name">Rick Hansen HOSA</string>
+
+    <string name="navigation_drawer_open">Open navigation drawer</string>
+    <string name="navigation_drawer_close">Close navigation drawer</string>
 </resources>

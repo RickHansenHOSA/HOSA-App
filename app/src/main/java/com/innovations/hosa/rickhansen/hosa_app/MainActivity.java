@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.CameraBridgeViewBase.CvCameraViewFrame;
+import org.opencv.android.JavaCamera2View;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
 import org.opencv.core.Core;
@@ -18,8 +19,21 @@ import org.opencv.android.CameraBridgeViewBase.CvCameraViewListener2;
 import org.opencv.imgproc.Imgproc;
 
 import android.app.Activity;
+import android.content.Intent;
+import android.graphics.Color;
 import android.os.Bundle;
+import android.support.annotation.ColorRes;
+import android.support.design.widget.NavigationView;
+import android.support.v4.content.ContextCompat;
+import android.support.v4.view.GravityCompat;
+import android.support.v4.view.ViewPager;
+import android.support.v4.widget.DrawerLayout;
+import android.support.v7.app.ActionBarDrawerToggle;
+import android.support.v7.app.AppCompatActivity;
+import android.support.v7.app.AppCompatDelegate;
+import android.support.v7.widget.Toolbar;
 import android.util.Log;
+import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.Window;
@@ -27,21 +41,32 @@ import android.view.WindowManager;
 import android.view.View.OnTouchListener;
 import android.view.SurfaceView;
 
-import com.innovations.hosa.rickhansen.hosa_opencvtest.R;
+import com.aurelhubert.ahbottomnavigation.AHBottomNavigation;
+import com.aurelhubert.ahbottomnavigation.AHBottomNavigationItem;
+import com.aurelhubert.ahbottomnavigation.notification.AHNotification;
+import com.innovations.hosa.rickhansen.hosa_app.R;
 
-public class MainActivity extends Activity implements OnTouchListener, CvCameraViewListener2 {
-    private static final String  TAG              = "MainActivity";
+public class MainActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener{
+    private static final String TAG = "MainActivity";
 
-    private boolean              mIsColorSelected = false;
-    private Mat                  mRgba;
-    private Scalar               mBlobColorRgba;
-    private Scalar               mBlobColorHsv;
-    private ColorBlobDetector    mDetector;
-    private Mat                  mSpectrum;
-    private Size                 SPECTRUM_SIZE;
-    private Scalar               CONTOUR_COLOR;
+    private Toolbar toolbar;
+    private NoSwipePager viewPager;
+    private BottomBarAdapter pagerAdapter;
 
-    private CameraBridgeViewBase mOpenCvCameraView;
+    AHBottomNavigation bottomNavigation;
+    AHBottomNavigationItem profile;
+    AHBottomNavigationItem diagnostics;
+    AHBottomNavigationItem imaging;
+    AHBottomNavigationItem network;
+
+    private static final int VIEW_MODE_PROFILE = 0;
+    private static final int VIEW_MODE_DIAGNOSTICS = 1;
+    private static final int VIEW_MODE_IMAGING = 2;
+    private static final int VIEW_MODE_NETWORK = 3;
+    private int mViewMode = 0;
+
+    static JavaCamera2View camera2View;
+
 
     private BaseLoaderCallback  mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
@@ -50,9 +75,7 @@ public class MainActivity extends Activity implements OnTouchListener, CvCameraV
                 case LoaderCallbackInterface.SUCCESS:
                 {
                     Log.i(TAG, "OpenCV loaded successfully");
-                    mOpenCvCameraView.enableView();
-                    mOpenCvCameraView.setOnTouchListener(MainActivity.this);
-                } break;
+                    } break;
                 default:
                 {
                     super.onManagerConnected(status);
@@ -73,19 +96,60 @@ public class MainActivity extends Activity implements OnTouchListener, CvCameraV
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
-        setContentView(R.layout.content_main);
+        setContentView(R.layout.activity_main);
 
-        mOpenCvCameraView = (CameraBridgeViewBase) findViewById(R.id.color_blob_detection_activity_surface_view);
-        mOpenCvCameraView.setVisibility(SurfaceView.VISIBLE);
-        mOpenCvCameraView.setCvCameraViewListener(this);
+        toolbar = (Toolbar) findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        getSupportActionBar().setTitle("KELP: Health");
+
+        bottomNavigation = (AHBottomNavigation) findViewById(R.id.bottom_navigation);
+        setupBottomNavBehaviors();
+        setupBottomNavStyle();
+
+        addBottomNavigationItems();
+        bottomNavigation.setCurrentItem(0);
+
+        // Set listeners
+        bottomNavigation.setOnTabSelectedListener(new AHBottomNavigation.OnTabSelectedListener() {
+            @Override
+            public boolean onTabSelected(int position, boolean wasSelected) {
+                switch (position) {
+                    case 0:
+                        mViewMode = VIEW_MODE_PROFILE;
+                        break;
+                    case 1:
+                        mViewMode = VIEW_MODE_DIAGNOSTICS;
+                        break;
+                    case 2:
+                        mViewMode = VIEW_MODE_IMAGING;
+                        break;
+                    case 3:
+                        mViewMode = VIEW_MODE_NETWORK;
+                        break;
+                    default:
+                        mViewMode = VIEW_MODE_PROFILE;
+                        break;
+                }
+                return true;
+            }
+        });
+
+        DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
+        ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(
+                MainActivity.this, drawer, toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close);
+        drawer.setDrawerListener(toggle);
+        toggle.syncState();
+
+        NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
+        navigationView.setNavigationItemSelectedListener(MainActivity.this);
+        navigationView.setItemIconTintList(null);
     }
 
     @Override
     public void onPause()
     {
         super.onPause();
-        if (mOpenCvCameraView != null)
-            mOpenCvCameraView.disableView();
+
     }
 
     @Override
@@ -103,98 +167,127 @@ public class MainActivity extends Activity implements OnTouchListener, CvCameraV
 
     public void onDestroy() {
         super.onDestroy();
-        if (mOpenCvCameraView != null)
-            mOpenCvCameraView.disableView();
+
+    }
+
+    @Override
+    public void onBackPressed() {
+        DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
+        if (drawer.isDrawerOpen(GravityCompat.START)) {
+            drawer.closeDrawer(GravityCompat.START);
+        } else {
+            super.onBackPressed();
+        }
+    }
+
+    @SuppressWarnings("StatementWithEmptyBody")
+    @Override
+    public boolean onNavigationItemSelected(MenuItem item) {
+        // Handle navigation view item clicks here.
+        int id = item.getItemId();
+
+        if (id == R.id.profile) {
+            mViewMode = VIEW_MODE_PROFILE;
+            bottomNavigation.setCurrentItem(0);
+            //Start a Class
+            Intent launchNewActivity = new Intent(MainActivity.this, UserProfile.class);
+            startActivity(launchNewActivity);
+
+
+        } else if (id == R.id.diagnostics) {
+            //Start a Class
+            /*Intent launchNewActivity = new Intent(MainActivity.this, class1.class);
+            startActivityForResult(launchNewActivity, 0);
+            */
+            mViewMode = VIEW_MODE_DIAGNOSTICS;
+            bottomNavigation.setCurrentItem(1);
+
+        } else if (id == R.id.imaging) {
+            mViewMode = VIEW_MODE_IMAGING;
+            bottomNavigation.setCurrentItem(2);
+        } else if (id == R.id.network) {
+            //Start a class
+            /*Intent launchNewActivity = new Intent(MainActivity.this, class1.class);
+            startActivity(launchNewActivity);
+*/
+            mViewMode = VIEW_MODE_NETWORK;
+            bottomNavigation.setCurrentItem(3);
+        }
+        DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
+        drawer.closeDrawer(GravityCompat.START);
+        return true;
     }
 
     public void onCameraViewStarted(int width, int height) {
-        mRgba = new Mat(height, width, CvType.CV_8UC4);
-        mDetector = new ColorBlobDetector();
-        mSpectrum = new Mat();
-        mBlobColorRgba = new Scalar(255);
-        mBlobColorHsv = new Scalar(255);
-        SPECTRUM_SIZE = new Size(200, 64);
-        CONTOUR_COLOR = new Scalar(255,0,0,255);
+
     }
 
     public void onCameraViewStopped() {
-        mRgba.release();
+        //mRgba.release();
     }
 
     public boolean onTouch(View v, MotionEvent event) {
-        int cols = mRgba.cols();
-        int rows = mRgba.rows();
 
-        int xOffset = (mOpenCvCameraView.getWidth() - cols) / 2;
-        int yOffset = (mOpenCvCameraView.getHeight() - rows) / 2;
-
-        int x = (int)event.getX() - xOffset;
-        int y = (int)event.getY() - yOffset;
-
-        Log.i(TAG, "Touch image coordinates: (" + x + ", " + y + ")");
-
-        if ((x < 0) || (y < 0) || (x > cols) || (y > rows)) return false;
-
-        Rect touchedRect = new Rect();
-
-        touchedRect.x = (x>4) ? x-4 : 0;
-        touchedRect.y = (y>4) ? y-4 : 0;
-
-        touchedRect.width = (x+4 < cols) ? x + 4 - touchedRect.x : cols - touchedRect.x;
-        touchedRect.height = (y+4 < rows) ? y + 4 - touchedRect.y : rows - touchedRect.y;
-
-        Mat touchedRegionRgba = mRgba.submat(touchedRect);
-
-        Mat touchedRegionHsv = new Mat();
-        Imgproc.cvtColor(touchedRegionRgba, touchedRegionHsv, Imgproc.COLOR_RGB2HSV_FULL);
-
-        // Calculate average color of touched region
-        mBlobColorHsv = Core.sumElems(touchedRegionHsv);
-        int pointCount = touchedRect.width*touchedRect.height;
-        for (int i = 0; i < mBlobColorHsv.val.length; i++)
-            mBlobColorHsv.val[i] /= pointCount;
-
-        mBlobColorRgba = converScalarHsv2Rgba(mBlobColorHsv);
-
-        Log.i(TAG, "Touched rgba color: (" + mBlobColorRgba.val[0] + ", " + mBlobColorRgba.val[1] +
-                ", " + mBlobColorRgba.val[2] + ", " + mBlobColorRgba.val[3] + ")");
-
-        mDetector.setHsvColor(mBlobColorHsv);
-
-        Imgproc.resize(mDetector.getSpectrum(), mSpectrum, SPECTRUM_SIZE, 0, 0, Imgproc.INTER_LINEAR_EXACT);
-
-        mIsColorSelected = true;
-
-        touchedRegionRgba.release();
-        touchedRegionHsv.release();
 
         return false; // don't need subsequent touch events
     }
 
     public Mat onCameraFrame(CvCameraViewFrame inputFrame) {
-        mRgba = inputFrame.rgba();
+        //mRgba = inputFrame.rgba();
 
-        if (mIsColorSelected) {
-            mDetector.process(mRgba);
-            List<MatOfPoint> contours = mDetector.getContours();
-            Log.e(TAG, "Contours count: " + contours.size());
-            Imgproc.drawContours(mRgba, contours, -1, CONTOUR_COLOR);
-
-            Mat colorLabel = mRgba.submat(4, 68, 4, 68);
-            colorLabel.setTo(mBlobColorRgba);
-
-            Mat spectrumLabel = mRgba.submat(4, 4 + mSpectrum.rows(), 70, 70 + mSpectrum.cols());
-            mSpectrum.copyTo(spectrumLabel);
-        }
-
-        return mRgba;
+        return new Mat();
     }
 
-    private Scalar converScalarHsv2Rgba(Scalar hsvColor) {
-        Mat pointMatRgba = new Mat();
-        Mat pointMatHsv = new Mat(1, 1, CvType.CV_8UC3, hsvColor);
-        Imgproc.cvtColor(pointMatHsv, pointMatRgba, Imgproc.COLOR_HSV2RGB_FULL, 4);
+    /**
+     * Adds styling properties to {@link AHBottomNavigation}
+     */
+    private void setupBottomNavStyle() {
+        /*
+        Set Bottom Navigation colors. Accent color for active item,
+        Inactive color when its view is disabled.
+        Will not be visible if setColored(true) and default current item is set.
+         */
+        bottomNavigation.setDefaultBackgroundColor(fetchColor(R.color.red));
+        bottomNavigation.setAccentColor(fetchColor(R.color.black));
+        bottomNavigation.setInactiveColor(fetchColor(R.color.transparent_green_color));
 
-        return new Scalar(pointMatRgba.get(0, 0));
+        // Colors for selected (active) and non-selected items.
+        bottomNavigation.setColoredModeColors(Color.WHITE,
+                fetchColor(R.color.brightBlue));
+
+        //  Displays item Title always (for selected and non-selected items)
+        bottomNavigation.setTitleState(AHBottomNavigation.TitleState.ALWAYS_SHOW);
     }
+
+    /**
+     * Adds (items) {@link AHBottomNavigationItem} to {@link AHBottomNavigation}
+     * Also assigns a distinct color to each Bottom Navigation item, used for the color ripple.
+     */
+    private void addBottomNavigationItems(){
+        profile = new AHBottomNavigationItem("Profile", R.drawable.rsz_profile);
+        diagnostics = new AHBottomNavigationItem("Diagnostics", R.drawable.rsz_data);
+        imaging = new AHBottomNavigationItem("Imaging", R.drawable.rsz_otoscope);
+        network = new AHBottomNavigationItem("Network", R.drawable.rsz_network);
+
+        bottomNavigation.addItem(profile);
+        bottomNavigation.addItem(diagnostics);
+        bottomNavigation.addItem(imaging);
+        bottomNavigation.addItem(network);
+    }
+
+    public void setupBottomNavBehaviors() {
+
+        bottomNavigation.setTranslucentNavigationEnabled(false);
+    }
+
+    /**
+     * Simple facade to fetch color resource, so I avoid writing a huge line every time.
+     *
+     * @param color to fetch
+     * @return int color value.
+     */
+    private int fetchColor(@ColorRes int color) {
+        return ContextCompat.getColor(this, color);
+    }
+
 }

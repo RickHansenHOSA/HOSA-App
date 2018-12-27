@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context="com.innovations.hosa.rickhansen.hosa_app.UserProfile"
+    android:background="@color/graylight"
+    android:theme="@style/AppTheme.NoActionBar"
+    android:orientation="vertical">
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="350dp">
+        <LinearLayout
+            android:background="@drawable/usergradient"
+            android:layout_width="match_parent"
+            android:layout_height="300dp"
+            android:orientation="vertical">
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="75dp"
+                android:scaleX="1.6"
+                android:scaleY="1.6"
+                android:src="@mipmap/ic_launcher_round" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="30dp"
+                android:text="Bless de Jesus Rojas"
+                android:textColor="@color/white"
+                android:textStyle="bold"
+                android:textSize="22sp"/>
+
+        </LinearLayout>
+
+        <android.support.v7.widget.CardView
+            android:layout_height= "130dp"
+            android:layout_width= "400dp"
+            android:layout_centerHorizontal = "true"
+            android:layout_marginTop = "275dp">
+            <LinearLayout
+                android:layout_height="match_parent"
+                android:layout_width="match_parent"
+                android:orientation="horizontal"
+                android:weightSum="3">
+
+            </LinearLayout>
+
+
+        </android.support.v7.widget.CardView>
+
+    </RelativeLayout>
+
+</LinearLayout>
